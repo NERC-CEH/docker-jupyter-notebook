@@ -78,8 +78,10 @@ EXPOSE 8888
 
 WORKDIR $HOME
 
+# Copy modified start script
+COPY ./start.sh /usr/local/bin/start.sh
+
 # Clone jupyter base-notebook scripts
-RUN wget -O /usr/local/bin/start.sh https://raw.githubusercontent.com/jupyter/docker-stacks/8f56e3c47fec4ff1a8a78b3883b1dccfe0e3f272/base-notebook/start.sh
 RUN wget -O /usr/local/bin/start-notebook.sh https://raw.githubusercontent.com/jupyter/docker-stacks/8f56e3c47fec4ff1a8a78b3883b1dccfe0e3f272/base-notebook/start-notebook.sh
 RUN wget -O /usr/local/bin/start-singleuser.sh https://raw.githubusercontent.com/jupyter/docker-stacks/8f56e3c47fec4ff1a8a78b3883b1dccfe0e3f272/base-notebook/start-singleuser.sh
 RUN chmod +x /usr/local/bin/*.sh
