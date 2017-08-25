@@ -2,9 +2,9 @@ FROM centos:6
 
 LABEL maintiner "joshua.foster@stfc.ac.uk"
 
-ENV MINICONDA_VERSION 4.3.21
 ENV CONDA_DIR /opt/conda
-ENV PATH $CONDA_DIR/bin:$PATH
+ENV SPARK_HOME /opt/spark
+ENV PATH $CONDA_DIR/bin:$SPARK_HOME/bin:$PATH
 ENV SHELL /bin/bash
 ENV NB_USER datalab
 ENV NB_UID 1000
@@ -30,6 +30,14 @@ RUN wget -O /tmp/tini https://github.com/krallin/tini/releases/download/v0.15.0/
     rm -rf /tmp/tini && \
     chmod +x /usr/bin/tini
 
+# Install Spark
+ENV SPARK_VER 2.1.0
+ENV HADOOP_VER 2.7
+RUN wget -O /tmp/spark-${SPARK_VER}-bin-hadoop${HADOOP_VER}.tgz https://archive.apache.org/dist/spark/spark-${SPARK_VER}/spark-${SPARK_VER}-bin-hadoop${HADOOP_VER}.tgz && \
+    tar -zxvf /tmp/spark-${SPARK_VER}-bin-hadoop${HADOOP_VER}.tgz && \
+    rm -rf /tmp/spark-${SPARK_VER}-bin-hadoop${HADOOP_VER}.tgz && \
+    mv /spark-${SPARK_VER}-bin-hadoop${HADOOP_VER} ${SPARK_HOME}
+
 # Add datalab user
 RUN useradd -m -s /bin/bash -N -u $NB_UID $NB_USER && \
     mkdir -p $CONDA_DIR && \
@@ -38,6 +46,7 @@ RUN useradd -m -s /bin/bash -N -u $NB_UID $NB_USER && \
 USER $NB_USER
 
 # Install conda
+ENV MINICONDA_VERSION 4.3.21
 RUN cd /tmp && \
     wget --quiet https://repo.continuum.io/miniconda/Miniconda3-${MINICONDA_VERSION}-Linux-x86_64.sh && \
     /bin/bash Miniconda3-${MINICONDA_VERSION}-Linux-x86_64.sh -f -b -p $CONDA_DIR && \
@@ -65,12 +74,19 @@ RUN virtualenv --system-site-packages $HOME/python &&  \
     mv /tmp/python2.kernel.json $HOME/.local/share/jupyter/kernels/python2/kernel.json &&  \
     rm -f /tmp/python2.kernel.json
 
-# Install JAP R as a kernel in Jupyter
-RUN mkdir -p $HOME/R-libs &&  \
-    echo -e ".libPaths('$HOME/R-libs')\n" > $HOME/.Rprofile &&  \
-    R -q -e "install.packages(c('repr', 'IRdisplay', 'crayon', 'pbdZMQ', 'devtools'), repos='https://cloud.r-project.org/')" && \
+# Add base lib for IRdisplay, kernel etc
+
+# Install R (default) as a kernel in Jupyter
+RUN mkdir -p $HOME/R-library &&  \
+    echo -e ".libPaths(file.path(Sys.getenv('HOME'), 'R-library'))" > $HOME/.Rprofile &&  \
+    R -q -e "install.packages(c('devtools', IRdisplay'), repos='https://cloud.r-project.org/')" && \
     R -q -e "devtools::install_github('IRkernel/IRkernel')" &&  \
-    R -q -e "IRkernel::installspec(displayname = 'R (JAP)', rprofile = '$HOME/.Rprofile')"
+    R -q -e "IRkernel::installspec(name = 'r-default', displayname = 'R', rprofile = '$HOME/.Rprofile')"
+
+# Install R with Spark Context as a kernel in Jupyter
+RUN cat $HOME/.Rprofile > $HOME/.Rprofile.spark &&  \
+    echo -e ".First <- function() { library(SparkR, lib.loc=file.path(Sys.getenv('SPARK_HOME'), 'R', 'lib')); sc <- sparkR.session(master=Sys.getenv('MASTER')); }" >> $HOME/.Rprofile.spark && \
+    R -q -e "IRkernel::installspec(name = 'r-spark', displayname = 'R (SparkR)', rprofile = '$HOME/.Rprofile.spark')"
 
 USER root
 
