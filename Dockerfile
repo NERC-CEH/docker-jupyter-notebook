@@ -79,7 +79,7 @@ RUN virtualenv --system-site-packages $HOME/python &&  \
 # Install R (default) as a kernel in Jupyter
 RUN mkdir -p $HOME/R-library &&  \
     echo -e ".libPaths(file.path(Sys.getenv('HOME'), 'R-library'))" > $HOME/.Rprofile &&  \
-    R -q -e "install.packages(c('devtools', 'IRdisplay'), repos='https://cloud.r-project.org/')" && \
+    R -q -e "install.packages(c('devtools', 'IRdisplay', 'future'), repos='https://cloud.r-project.org/')" && \
     R -q -e "devtools::install_github('IRkernel/IRkernel')" &&  \
     R -q -e "IRkernel::installspec(name = 'r-default', displayname = 'R', rprofile = '$HOME/.Rprofile')"
 
