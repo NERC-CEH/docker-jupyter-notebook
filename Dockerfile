@@ -85,7 +85,7 @@ RUN mkdir -p $HOME/R-library &&  \
 
 # Install R with Spark Context as a kernel in Jupyter
 RUN cat $HOME/.Rprofile > $HOME/.Rprofile.spark &&  \
-    echo -e ".First <- function() { library(SparkR, lib.loc=file.path(Sys.getenv('SPARK_HOME'), 'R', 'lib')); sc <<- sparkR.session(master=Sys.getenv('MASTER')); }" >> $HOME/.Rprofile.spark && \
+    echo -e ".First <- function() { library(SparkR, lib.loc=file.path(Sys.getenv('SPARK_HOME'), 'R', 'lib')); sparkR.session(master=Sys.getenv('MASTER')); }" >> $HOME/.Rprofile.spark && \
     R -q -e "IRkernel::installspec(name = 'r-spark', displayname = 'R (SparkR)', rprofile = '$HOME/.Rprofile.spark')"
 
 USER root
