@@ -21,7 +21,7 @@ RUN yum install -y epel-release && \
     yum install -y jasmin-sci-vm
 
 # Add wget, jq, libcurl and sudo
-RUN yum install -y wget jq libcurl-devel sudo && \
+RUN yum install -y wget jq libcurl-devel sudo libxml2-devel && \
     yum clean all
 
 # Install Tini
@@ -74,18 +74,18 @@ RUN virtualenv --system-site-packages $HOME/python &&  \
     mv /tmp/python2.kernel.json $HOME/.local/share/jupyter/kernels/python2/kernel.json &&  \
     rm -f /tmp/python2.kernel.json
 
-# Add base lib for IRdisplay, kernel etc
-
 # Install R (default) as a kernel in Jupyter
 RUN mkdir -p $HOME/R-library &&  \
-    echo -e ".libPaths(file.path(Sys.getenv('HOME'), 'R-library'))" > $HOME/.Rprofile &&  \
-    R -q -e "install.packages(c('devtools', 'IRdisplay', 'future'), repos='https://cloud.r-project.org/')" && \
+    echo -e "options(repos = list(CRAN = 'https://cran.rstudio.com/'))" >  $HOME/.Rprofile && \
+    echo -e ".libPaths(file.path(Sys.getenv('HOME'), 'R-library'))" >> $HOME/.Rprofile &&  \
+    R -q -e "install.packages(c('devtools', 'future', 'IRdisplay', 'zoon'))" && \
+    R -q -e "devtools::install_github('BiologicalRecordsCentre/sparta@0.1.30')" && \
     R -q -e "devtools::install_github('IRkernel/IRkernel')" &&  \
     R -q -e "IRkernel::installspec(name = 'r-default', displayname = 'R', rprofile = '$HOME/.Rprofile')"
 
 # Install R with Spark Context as a kernel in Jupyter
 RUN cat $HOME/.Rprofile > $HOME/.Rprofile.spark &&  \
-    echo -e ".First <- function() { library(SparkR, lib.loc=file.path(Sys.getenv('SPARK_HOME'), 'R', 'lib')); sc <<- sparkR.session(master=Sys.getenv('MASTER')); }" >> $HOME/.Rprofile.spark && \
+    echo -e ".First <- function() { library(SparkR, lib.loc=file.path(Sys.getenv('SPARK_HOME'), 'R', 'lib')); sparkR.session(master=Sys.getenv('MASTER')); }" >> $HOME/.Rprofile.spark && \
     R -q -e "IRkernel::installspec(name = 'r-spark', displayname = 'R (SparkR)', rprofile = '$HOME/.Rprofile.spark')"
 
 USER root
