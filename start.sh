@@ -15,11 +15,8 @@ if [ $(id -u) == 0 ] ; then
     echo "Set user UID to: $NB_UID"
     usermod -u $NB_UID $NB_USER
 
-  # R_LIBS_SITE path has contains R version which need to be to be set by R.
-  R_LIBS_SITE_FIXED=$(R --slave -e "write(gsub('%v', R.version\$minor,Sys.getenv('R_LIBS_SITE')), stdout())")
-
   # Fix permissions for home and jupyter directories
-    for d in "$CONDA_DIR" "$SPARK_HOME" "$R_LIBS_SITE_FIXED" "/etc/jupyter" "/home/$NB_USER"; do
+    for d in "$CONDA_DIR" "$SPARK_HOME" "$R_LIBS_SITE_USER" "/etc/jupyter" "/home/$NB_USER"; do
       if [[ ! -z "$d" && -d "$d" ]]; then
         echo "Set ownership to uid $NB_UID: $d"
         chown -R $NB_UID "$d"

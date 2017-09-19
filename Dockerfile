@@ -40,23 +40,26 @@ RUN wget -O /tmp/spark-${SPARK_VER}-bin-hadoop${HADOOP_VER}.tgz https://archive.
     mv /spark-${SPARK_VER}-bin-hadoop${HADOOP_VER} ${SPARK_HOME}
 
 # The current R version on EPEL is install as a requirement of JAP and is not 
-# frozen. R is used to determine the current installed version. Environment 
-# variables R_LIBS_SITE and R_LIBS_USER paths are included in paths searched
-# by R for library packages. Only directories which exist will be included. R 
-# uses '%v' as a string expansion to include current version number.
-ENV R_PLATFORM x86_64-centos_6-linux-gnu
-ENV R_LIBS_SITE /opt/R-libs/site/$R_PLATFORM/%v
-ENV R_LIBS_USER /data/R-libs/global/$R_PLATFORM/%v
-ENV R_PACKRAT_CACHE_DIR /data/R-libs/cache/$R_PLATFORM
+# frozen. Environment variables R_LIBS_SITE and R_LIBS_USER paths are included
+# in paths searched by R for library packages. Only directories which exist
+# will be included.
+ENV R_LIBS_SITE_ROOT /opt/R-libs/site
+ENV R_LIBS_SITE_USER /opt/R-libs/user
+ENV R_LIBS_SITE $R_LIBS_SITE_USER:$R_LIBS_SITE_ROOT
+# Install core libraries as root user
+RUN mkdir -p $R_LIBS_SITE_ROOT && \
+    R -q -e "install.packages(c('devtools', 'dplyr', 'IRdisplay', 'knitr', 'magrittr', 'packrat'), repos='https://cloud.r-project.org/')" && \
+    R -q -e "devtools::install_github('IRkernel/IRkernel@0.8.8')"
+# Fix base library path for Packrat compatibility with Debian/Ubuntu
+RUN mkdir -p /usr/lib/R && \
+    ln -s /usr/lib64/R/library/ /usr/lib/R/library
 
 # Add datalab user
-RUN R_LIB_SITE_FIXED=$(R --slave -e "write(gsub('%v', R.version\$minor,Sys.getenv('R_LIBS_SITE')), stdout())") && \
-    useradd -m -s /bin/bash -N -u $NB_UID $NB_USER && \
+RUN useradd -m -s /bin/bash -N -u $NB_UID $NB_USER && \
     mkdir -p $CONDA_DIR && \
-    mkdir -p $R_LIB_SITE_FIXED && \
+    mkdir -p $R_LIBS_SITE_USER && \
     chown -R $NB_USER $CONDA_DIR && \
-    chown -R $NB_USER $SPARK_HOME && \
-    chown -R $NB_USER $R_LIB_SITE_FIXED
+    chown -R $NB_USER $R_LIBS_SITE_USER
 
 USER $NB_USER
 
@@ -92,8 +95,6 @@ RUN virtualenv --system-site-packages $HOME/python &&  \
 # Install R (default) as a kernel in Jupyter
 RUN echo -e "options(repos = list(CRAN = 'https://cran.rstudio.com/'))" >  $HOME/.Rprofile && \
     chmod -w $HOME/.Rprofile && \
-    R -q -e "install.packages(c('devtools', 'dplyr', 'IRdisplay', 'knitr', 'magrittr', 'packrat'))" && \
-    R -q -e "devtools::install_github('IRkernel/IRkernel')" &&  \
     R -q -e "IRkernel::installspec(name = 'r-default', displayname = 'R', rprofile = '$HOME/.Rprofile')"
 
 # Install R with Spark Context as a kernel in Jupyter
