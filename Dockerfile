@@ -93,7 +93,7 @@ RUN virtualenv --system-site-packages $HOME/python &&  \
     rm -f /tmp/python2.kernel.json
 
 # Install R (default) as a kernel in Jupyter
-RUN echo -e "options(repos = list(CRAN = 'https://cran.rstudio.com/'))" >  $HOME/.Rprofile && \
+RUN echo -e "options(repos = list(CRAN = 'https://cloud.r-project.org/'))" >  $HOME/.Rprofile && \
     chmod -w $HOME/.Rprofile && \
     R -q -e "IRkernel::installspec(name = 'r-default', displayname = 'R', rprofile = '$HOME/.Rprofile')"
 
