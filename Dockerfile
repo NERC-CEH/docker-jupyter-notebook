@@ -18,7 +18,8 @@ USER root
 RUN yum install -y epel-release && \
     rpm -Uvh http://dist.ceda.ac.uk/yumrepo/RPMS/ceda-yumrepo-0.1-1.ceda.el6.noarch.rpm && \
     sed -i '/\[epel\]/a exclude=grib_api* geos* gdal* grass* GraphicsMagick*' /etc/yum.repos.d/epel.repo && \
-    yum install -y jasmin-sci-vm
+    yum install -y jasmin-sci-vm && \
+    yum clean all
 
 # Add wget, jq, libcurl and sudo
 RUN yum install -y wget jq libcurl-devel sudo libxml2-devel && \
@@ -38,10 +39,27 @@ RUN wget -O /tmp/spark-${SPARK_VER}-bin-hadoop${HADOOP_VER}.tgz https://archive.
     rm -rf /tmp/spark-${SPARK_VER}-bin-hadoop${HADOOP_VER}.tgz && \
     mv /spark-${SPARK_VER}-bin-hadoop${HADOOP_VER} ${SPARK_HOME}
 
+# The current R version on EPEL is install as a requirement of JAP and is not 
+# frozen. Environment variables R_LIBS_SITE and R_LIBS_USER paths are included
+# in paths searched by R for library packages. Only directories which exist
+# will be included.
+ENV R_LIBS_SITE_ROOT /opt/R-libs/site
+ENV R_LIBS_SITE_USER /opt/R-libs/user
+ENV R_LIBS_SITE $R_LIBS_SITE_USER:$R_LIBS_SITE_ROOT
+# Install core libraries as root user
+RUN mkdir -p $R_LIBS_SITE_ROOT && \
+    R -q -e "install.packages(c('devtools', 'dplyr', 'IRdisplay', 'knitr', 'magrittr', 'packrat'), repos='https://cloud.r-project.org/')" && \
+    R -q -e "devtools::install_github('IRkernel/IRkernel@0.8.8')"
+# Fix base library path for Packrat compatibility with Debian/Ubuntu
+RUN mkdir -p /usr/lib/R && \
+    ln -s /usr/lib64/R/library/ /usr/lib/R/library
+
 # Add datalab user
 RUN useradd -m -s /bin/bash -N -u $NB_UID $NB_USER && \
     mkdir -p $CONDA_DIR && \
-    chown -R $NB_USER $CONDA_DIR
+    mkdir -p $R_LIBS_SITE_USER && \
+    chown -R $NB_USER $CONDA_DIR && \
+    chown -R $NB_USER $R_LIBS_SITE_USER
 
 USER $NB_USER
 
@@ -75,17 +93,14 @@ RUN virtualenv --system-site-packages $HOME/python &&  \
     rm -f /tmp/python2.kernel.json
 
 # Install R (default) as a kernel in Jupyter
-RUN mkdir -p $HOME/R-library &&  \
-    echo -e "options(repos = list(CRAN = 'https://cran.rstudio.com/'))" >  $HOME/.Rprofile && \
-    echo -e ".libPaths(file.path(Sys.getenv('HOME'), 'R-library'))" >> $HOME/.Rprofile &&  \
-    R -q -e "install.packages(c('devtools', 'future', 'IRdisplay', 'zoon'))" && \
-    R -q -e "devtools::install_github('BiologicalRecordsCentre/sparta@0.1.30')" && \
-    R -q -e "devtools::install_github('IRkernel/IRkernel')" &&  \
+RUN echo -e "options(repos = list(CRAN = 'https://cloud.r-project.org/'))" >  $HOME/.Rprofile && \
+    chmod -w $HOME/.Rprofile && \
     R -q -e "IRkernel::installspec(name = 'r-default', displayname = 'R', rprofile = '$HOME/.Rprofile')"
 
 # Install R with Spark Context as a kernel in Jupyter
 RUN cat $HOME/.Rprofile > $HOME/.Rprofile.spark &&  \
     echo -e ".First <- function() { library(SparkR, lib.loc=file.path(Sys.getenv('SPARK_HOME'), 'R', 'lib')); sparkR.session(master=Sys.getenv('MASTER')); }" >> $HOME/.Rprofile.spark && \
+    chmod -w $HOME/.Rprofile.spark && \
     R -q -e "IRkernel::installspec(name = 'r-spark', displayname = 'R (SparkR)', rprofile = '$HOME/.Rprofile.spark')"
 
 USER root

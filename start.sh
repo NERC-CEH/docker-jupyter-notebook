@@ -16,7 +16,7 @@ if [ $(id -u) == 0 ] ; then
     usermod -u $NB_UID $NB_USER
 
   # Fix permissions for home and jupyter directories
-    for d in "$CONDA_DIR" "/etc/jupyter" "/home/$NB_USER"; do
+    for d in "$CONDA_DIR" "$SPARK_HOME" "$R_LIBS_SITE_USER" "/etc/jupyter" "/home/$NB_USER"; do
       if [[ ! -z "$d" && -d "$d" ]]; then
         echo "Set ownership to uid $NB_UID: $d"
         chown -R $NB_UID "$d"
