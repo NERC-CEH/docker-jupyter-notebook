@@ -1,0 +1,87 @@
+#!/bin/bash
+# Wrapper to control creation/deletion of Conda Environments within JupyterLab hosted on Datalabs
+
+ENV_NAME=$2
+ENV_BASE=${CONDA_ENV_DIR:-/data/conda/}
+KERNEL_BASE=${JUPYTER_DATA_DIR:-/data/.jupyter}
+ENV_PATH=$ENV_BASE/$ENV_NAME
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+NC='\033[0m'
+
+function logger () {
+  echo -e "${GREEN}[`date +%H:%M:%S/%d-%h`]: $1 ${NC}"
+}
+
+function error () {
+  echo -e "${RED}[`date +%H:%M:%S/%d-%h`]: $1 ${NC}"
+  exit 1
+}
+
+function print_help {
+  echo "
+
+This simple command can be used to create or delete conda environments, see usage below;
+
+Adding
+env-control add NEW_CONDA_ENVIRONMENT
+
+Removing
+env-control remove CURRENT_CONDA_ENVIRONMENT
+
+"
+}
+
+function create_env {
+  logger "Creating environment $ENV_NAME"
+  mkdir -p $ENV_BASE
+  conda create --prefix $ENV_PATH -y
+  source activate $ENV_PATH
+  logger "Installing ipykernel & irkernel"
+  conda install ipykernel r-irkernel -y
+  if [ "$?" != "0" ]; then
+    error "Failed to install ipython and irkernel"
+  fi
+
+  logger "Setting up python Kernel"
+  create_env_python
+
+
+  logger "Setting up R Kernel"
+  create_env_R
+}
+
+function remove_env {
+  logger "Removing environment $ENV_NAME"
+  conda env remove -p $ENV_PATH -y
+  if [ -d $KERNEL_BASE/kernels/ ]; then
+    rm -rf $KERNEL_BASE/kernels/$ENV_NAME-python
+    rm -rf $KERNEL_BASE/kernels/$ENV_NAME-python
+  fi
+  logger "Environment removed - $ENV_NAME, please restart browser for Kernel deletion to complete."
+}
+
+function create_env_python {
+  python -m ipykernel install --user --name $ENV_NAME-python --display-name "python-$ENV_NAME"
+  if [ "$?" != "0" ]; then
+    error "Failed to install Python kernel, please troubleshoot"
+  fi
+}
+
+function create_env_R {
+  R -e "IRkernel::installspec(name = '$ENV_NAME-R', displayname = 'R-$ENV_NAME')"
+  if [ "$?" != "0" ]; then
+    error "Failed to install R kernel ipython, please troubleshoot"
+  fi
+}
+
+if [ "$1" == "add" ]; then
+  create_env
+  logger "Environment setup - $ENV_NAME complete, please restart browser for Kernel to be available."
+elif [ "$1" == "remove" ]; then
+  remove_env
+  logger "Environment setup - $ENV_NAME complete, please restart browser for Kernel to be available."
+else
+  print_help
+  exit 1
+fi
